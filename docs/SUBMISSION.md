@@ -1,8 +1,8 @@
-# Devpost submission draft
+# Devpost submission record
 
-Live validation status: **passed** on release commit [`af4373f`](https://github.com/AchieRR/schemaflight/commit/af4373f1a1609c28aaf5ce3131809f0434e08526) in [public run 29655960989](https://github.com/AchieRR/schemaflight/actions/runs/29655960989), with [durable sanitized evidence](https://github.com/AchieRR/schemaflight/releases/tag/live-validation-af4373f). The entrant authorized preparation and publication of the entry in the operating thread. Eligibility, ownership, permitted-period, and rules attestations must still be answered truthfully from the entrant's actual facts during registration. The public demo is live; registration and the final video are still outstanding.
+Live validation status: **passed** on release commit [`af4373f`](https://github.com/AchieRR/schemaflight/commit/af4373f1a1609c28aaf5ce3131809f0434e08526) in [public run 29655960989](https://github.com/AchieRR/schemaflight/actions/runs/29655960989), with [durable sanitized evidence](https://github.com/AchieRR/schemaflight/releases/tag/live-validation-af4373f). The public demo is live, the 2:25 video is public, and the project is publicly submitted on Devpost.
 
-Status: **authorized draft** — live validation and publication permission are complete; register the entry, validate the required entrant attestations, and finish the public demo video before final submission.
+Status: **submitted** — Devpost shows all 5/5 steps complete and the project as `SUBMITTED` at https://devpost.com/software/schemaflight (verified July 18, 2026).
 
 ## Listing fields
 
@@ -88,13 +88,13 @@ Metadata grounding is not just retrieval. A safe code generator needs completene
 | Real-world usefulness | Produces SQL, tests, patches, rollback, owner routing, and a manifest suitable for code review. |
 | Submission quality | Public quickstart, checked-in examples, under-three-minute runbook, and self-contained evidence report. |
 
-## Human pre-submission checklist
+## Submission verification checklist
 
-- Confirm the entrant is at least 18 / age of majority and resides in an eligible jurisdiction.
-- Confirm no employer, client, team, or organization owns or restricts the work.
-- Read and accept the binding official rules, releases, publicity license, and verification/tax requirements.
-- Confirm all work was created during the permitted submission period and disclose development assistance accurately.
-- Complete the live validation checklist and replace every `pending` field with a public, sign-in-free URL.
-- Review the public repository for secrets, personal paths, third-party marks, and unsupported claims.
-- Verify the video is under three minutes and exactly matches the release commit.
-- Save a draft first; submit only after the final human review.
+- [x] Devpost reports the project as `SUBMITTED` with 5/5 steps complete.
+- [x] Public project page: https://devpost.com/software/schemaflight
+- [x] Public repository includes an Apache 2.0 license and complete setup instructions.
+- [x] Public live report is linked from the entry.
+- [x] Public demonstration video is 2:25 and under the three-minute limit.
+- [x] Public live DataHub validation evidence is linked and sign-in-free.
+- [x] Submission category, story, technologies, repository, live report, and video are populated.
+- [ ] Monitor the entry for organizer questions, verification requests, and judging updates through the deadline and award period.
