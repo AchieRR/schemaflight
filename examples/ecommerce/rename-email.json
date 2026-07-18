@@ -1,0 +1,7 @@
+{
+  "dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:duckdb,shop.customer,PROD)",
+  "operation": "rename_column",
+  "source_field": "email",
+  "target_field": "primary_email",
+  "dialect": "duckdb"
+}

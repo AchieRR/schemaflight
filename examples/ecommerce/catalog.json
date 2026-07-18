@@ -1,0 +1,50 @@
+{
+  "assets": [
+    {
+      "urn": "urn:li:dataset:(urn:li:dataPlatform:duckdb,shop.customer,PROD)",
+      "name": "shop.customer",
+      "owners": ["data-platform"],
+      "fields": [
+        {"name": "customer_id", "type": "BIGINT", "nullable": false, "tags": []},
+        {"name": "email", "type": "VARCHAR", "nullable": false, "tags": ["PII"]},
+        {"name": "created_at", "type": "TIMESTAMP", "nullable": false, "tags": []}
+      ]
+    },
+    {
+      "urn": "urn:li:dataset:(urn:li:dataPlatform:duckdb,analytics.customer_360,PROD)",
+      "name": "analytics.customer_360",
+      "owners": ["analytics"],
+      "fields": [
+        {"name": "customer_id", "type": "BIGINT", "nullable": false, "tags": []},
+        {"name": "email", "type": "VARCHAR", "nullable": false, "tags": ["PII"]}
+      ]
+    },
+    {
+      "urn": "urn:li:dashboard:(looker,retention_dashboard)",
+      "name": "retention_dashboard",
+      "owners": ["growth"],
+      "fields": []
+    }
+  ],
+  "lineage": [
+    {
+      "upstream_urn": "urn:li:dataset:(urn:li:dataPlatform:duckdb,shop.customer,PROD)",
+      "upstream_field": "email",
+      "downstream_urn": "urn:li:dataset:(urn:li:dataPlatform:duckdb,analytics.customer_360,PROD)",
+      "downstream_field": "email"
+    },
+    {
+      "upstream_urn": "urn:li:dataset:(urn:li:dataPlatform:duckdb,analytics.customer_360,PROD)",
+      "upstream_field": "email",
+      "downstream_urn": "urn:li:dashboard:(looker,retention_dashboard)",
+      "downstream_field": "email"
+    }
+  ],
+  "queries": [
+    {
+      "id": "retention-export",
+      "asset_urn": "urn:li:dashboard:(looker,retention_dashboard)",
+      "sql": "SELECT customer_id, email FROM analytics.customer_360"
+    }
+  ]
+}

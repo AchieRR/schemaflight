@@ -1,0 +1,58 @@
+{
+  "artifacts": [
+    "01_expand.sql",
+    "02_migrate.sql",
+    "03_contract.sql",
+    "checks.sql",
+    "impact-manifest.json",
+    "migration-decision.md",
+    "query_patches/retention-export.sql",
+    "report.html",
+    "rollback.sql"
+  ],
+  "evidence": {
+    "impacted_urns": [
+      "urn:li:dataset:(urn:li:dataPlatform:duckdb,analytics.customer_360,PROD)",
+      "urn:li:dashboard:(looker,retention_dashboard)"
+    ],
+    "lineage_edges": [
+      {
+        "downstream_field": "email",
+        "downstream_urn": "urn:li:dataset:(urn:li:dataPlatform:duckdb,analytics.customer_360,PROD)",
+        "upstream_field": "email",
+        "upstream_urn": "urn:li:dataset:(urn:li:dataPlatform:duckdb,shop.customer,PROD)"
+      },
+      {
+        "downstream_field": "email",
+        "downstream_urn": "urn:li:dashboard:(looker,retention_dashboard)",
+        "upstream_field": "email",
+        "upstream_urn": "urn:li:dataset:(urn:li:dataPlatform:duckdb,analytics.customer_360,PROD)"
+      }
+    ],
+    "lineage_hops": 2,
+    "queries_requiring_review": [],
+    "query_ids": [
+      "retention-export"
+    ]
+  },
+  "owner_routes": {
+    "analytics": [
+      "analytics.customer_360"
+    ],
+    "growth": [
+      "retention_dashboard"
+    ]
+  },
+  "request": {
+    "operation": "rename_column",
+    "source_field": "email",
+    "target_field": "primary_email"
+  },
+  "source": {
+    "field_tags": [
+      "PII"
+    ],
+    "name": "shop.customer",
+    "urn": "urn:li:dataset:(urn:li:dataPlatform:duckdb,shop.customer,PROD)"
+  }
+}
