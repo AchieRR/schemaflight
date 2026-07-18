@@ -95,6 +95,65 @@ jobs:
             --datahub-server http://localhost:8080 \
             | tee build/live-validation/seed.jsonl
 
+      - name: Wait for the indexed two-hop lineage
+        run: |
+          python - <<'PY'
+          import json
+          import time
+          from pathlib import Path
+
+          from schemaflight.datahub_catalog import AgentContextCatalog
+
+          source = "urn:li:dataset:(urn:li:dataPlatform:duckdb,shop.customer,PROD)"
+          model = "urn:li:dataset:(urn:li:dataPlatform:duckdb,analytics.customer_360,PROD)"
+          consumer = "urn:li:dataset:(urn:li:dataPlatform:duckdb,growth.retention_export,PROD)"
+          evidence = Path("build/live-validation/lineage-readiness.json")
+          deadline = time.monotonic() + 180
+          attempts = 0
+          latest: dict[str, object] = {}
+
+          while time.monotonic() < deadline:
+              attempts += 1
+              try:
+                  catalog = AgentContextCatalog.connect(server="http://localhost:8080")
+                  first_hop = catalog.downstream(source, "email")
+                  second_hop = catalog.downstream(model, "email")
+                  latest = {
+                      "attempts": attempts,
+                      "first_hop": first_hop,
+                      "second_hop": second_hop,
+                  }
+                  first_ready = any(
+                      edge["downstream_urn"] == model
+                      and edge["downstream_field"] == "email"
+                      for edge in first_hop
+                  )
+                  second_ready = any(
+                      edge["downstream_urn"] == consumer
+                      and edge["downstream_field"] == "email"
+                      for edge in second_hop
+                  )
+                  if first_ready and second_ready:
+                      latest["ready"] = True
+                      evidence.write_text(
+                          json.dumps(latest, indent=2, sort_keys=True) + "\n"
+                      )
+                      print(json.dumps(latest, sort_keys=True))
+                      break
+              except Exception as error:
+                  latest = {
+                      "attempts": attempts,
+                      "error": f"{type(error).__name__}: {error}",
+                  }
+              time.sleep(5)
+          else:
+              latest["ready"] = False
+              evidence.write_text(json.dumps(latest, indent=2, sort_keys=True) + "\n")
+              raise RuntimeError(
+                  "DataHub did not expose the seeded two-hop column lineage within 180 seconds"
+              )
+          PY
+
       - name: Compile from live metadata without mutation
         run: |
           python -m schemaflight compile \
