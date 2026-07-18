@@ -6,6 +6,8 @@ A column rename can look local in a pull request while silently breaking models,
 
 Built for **Build with DataHub: The Agent Hackathon**, in the **Metadata-Aware Code Generation & Development** category. The implementation uses the official DataHub Agent Context Kit in live mode and a deterministic snapshot adapter for a zero-infrastructure demo.
 
+[Open the public evidence report](https://achierr.github.io/schemaflight/examples/ecommerce/generated/report.html), inspect the [successful live DataHub validation](https://github.com/AchieRR/schemaflight/actions/runs/29655960989), or download its [durable sanitized evidence](https://github.com/AchieRR/schemaflight/releases/tag/live-validation-af4373f).
+
 ## What comes out
 
 For `shop.customer.email -> primary_email`, the included ecommerce graph discovers `analytics.customer_360` and `retention_dashboard`, routes acknowledgements to their owners, patches a recorded query, and creates:
@@ -76,7 +78,7 @@ python -m schemaflight seed-datahub --datahub-server http://localhost:8080
 python -m schemaflight compile --datahub-server http://localhost:8080 --request examples/ecommerce/rename-email.json --output build/live-demo
 ```
 
-`seed-datahub` upserts three synthetic DuckDB datasets with two-hop column lineage, ownership, a PII field tag, and a recorded retention query through official DataHub SDK/emitter APIs. Synchronous emission makes the following compile deterministic, and the command is safe to rerun. For an authenticated instance, expose a scoped token as `DATAHUB_GMS_TOKEN`; the token is never written to an artifact.
+`seed-datahub` upserts three synthetic DuckDB datasets with two-hop column lineage, ownership, a PII field tag, and a recorded retention query through official DataHub SDK/emitter APIs. The command is safe to rerun. DataHub's graph index is eventually consistent, so automation should wait until the expected metadata is queryable; the live validation workflow includes a bounded, fail-closed readiness gate. For an authenticated instance, expose a scoped token as `DATAHUB_GMS_TOKEN`; the token is never written to an artifact.
 
 To publish the generated decision record back to DataHub, opt in to the only mutation in the compiler path:
 
@@ -113,6 +115,8 @@ The safety decision and graph traversal are deterministic. No LLM is used to inv
 ## Verification
 
 The test suite covers the public compiler path, CLI output, branching/cyclic lineage, fail-closed DataHub pagination, official package serialization, explicit write-back, target-field collision rejection, path controls, and the generated report. The complete expand/migrate/validate/contract lifecycle executes against an in-memory DuckDB database.
+
+The public [live DataHub validation run](https://github.com/AchieRR/schemaflight/actions/runs/29655960989) passed against release commit [`af4373f`](https://github.com/AchieRR/schemaflight/commit/af4373f1a1609c28aaf5ce3131809f0434e08526), including live two-hop lineage, PII tag and owner reads, query patch generation, Chrome rendering, explicit Decision document write-back/read-back, 26 regressions, and sanitized evidence upload.
 
 ```console
 python -m pytest

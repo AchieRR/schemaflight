@@ -1,6 +1,8 @@
 # Devpost submission draft
 
-Status: **draft only — do not publish or submit before human eligibility/rules review and live validation.**
+Live validation status: **passed** on release commit [`af4373f`](https://github.com/AchieRR/schemaflight/commit/af4373f1a1609c28aaf5ce3131809f0434e08526) in [public run 29655960989](https://github.com/AchieRR/schemaflight/actions/runs/29655960989), with [durable sanitized evidence](https://github.com/AchieRR/schemaflight/releases/tag/live-validation-af4373f). The entrant authorized preparation and publication of the entry in the operating thread. Eligibility, ownership, permitted-period, and rules attestations must still be answered truthfully from the entrant's actual facts during registration. The public demo is live; registration and the final video are still outstanding.
+
+Status: **authorized draft** — live validation and publication permission are complete; register the entry, validate the required entrant attestations, and finish the public demo video before final submission.
 
 ## Listing fields
 
@@ -14,9 +16,9 @@ Status: **draft only — do not publish or submit before human eligibility/rules
 
 **Built with:** Python 3.13, DataHub Core 1.6.0, `datahub-agent-context[langchain]`, DuckDB, SQLGlot, pytest, Ruff, HTML/CSS.
 
-**Repository:** pending public Apache-2.0 GitHub URL
+**Repository:** https://github.com/AchieRR/schemaflight
 
-**Try it out:** pending public report/demo URL
+**Try it out:** https://achierr.github.io/schemaflight/examples/ecommerce/generated/report.html
 
 **Demo video:** pending public video URL, under three minutes
 
@@ -62,6 +64,7 @@ Independent review converted those into regression tests. The final lifecycle re
 - Fail-closed evidence handling and 26 local tests, plus a pinned official-package CI contract job.
 - Checked-in mergeable sample artifacts and a self-contained visual report.
 - Two independent review passes with every P1/P2 code finding resolved.
+- A public end-to-end DataHub Core v1.6.0 validation with live lineage, PII tag, owners, recorded query, browser evidence, and Decision document write-back/read-back.
 
 ### What we learned
 
