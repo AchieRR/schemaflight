@@ -20,7 +20,7 @@ Status: **authorized draft** — live validation and publication permission are 
 
 **Try it out:** https://achierr.github.io/schemaflight/examples/ecommerce/generated/report.html
 
-**Demo video:** pending public video URL, under three minutes
+**Demo video:** https://youtu.be/-wYRVm-7dDs (2:25; public publication pending)
 
 ## About the project
 
