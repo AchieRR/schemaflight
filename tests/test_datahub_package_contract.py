@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 import pytest
@@ -14,8 +15,10 @@ DataHubTag = datahub_tag.Tag
 class RecordingEntities:
     def __init__(self) -> None:
         self.proposal_counts: list[int] = []
+        self.entities: list[Any] = []
 
     def upsert(self, dataset: Any, *, emit_mode: Any) -> None:
+        self.entities.append(dataset)
         self.proposal_counts.append(len(list(dataset.as_mcps())))
 
 
@@ -46,6 +49,15 @@ def test_demo_entities_serialize_with_the_pinned_official_datahub_sdk() -> None:
     assert result["tags_upserted"] == 1
     assert len(client.entities.proposal_counts) == 4
     assert all(count > 0 for count in client.entities.proposal_counts)
+    source = client.entities.entities[1]
+    schema_mcp = next(
+        proposal.make_mcp()
+        for proposal in source.as_mcps()
+        if proposal.make_mcp().aspectName == "schemaMetadata"
+    )
+    schema = json.loads(schema_mcp.aspect.value)
+    email = next(field for field in schema["fields"] if field["fieldPath"] == "email")
+    assert email["globalTags"] == {"tags": [{"tag": "urn:li:tag:PII"}]}
 
 
 def test_demo_query_serializes_with_official_datahub_aspects() -> None:

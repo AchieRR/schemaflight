@@ -20,6 +20,7 @@ def seed_demo_catalog(
     _dataset_type: type[Any] | None = None,
     _tag_type: type[Any] | None = None,
     _emit_mode: Any | None = None,
+    _field_tagger: Any | None = None,
     _query_writer: Any | None = None,
 ) -> dict[str, Any]:
     """Upsert the deterministic SchemaFlight demo graph through the official SDK."""
@@ -60,7 +61,12 @@ def seed_demo_catalog(
         ],
         owners=["data-platform"],
     )
-    source["email"].set_tags([str(pii_tag.urn)])
+    field_tagger = _field_tagger or _set_ingestion_field_tags
+    field_tagger(
+        dataset=source,
+        field="email",
+        tags=[str(pii_tag.urn)],
+    )
 
     model = _dataset_type(
         platform="duckdb",
@@ -108,6 +114,14 @@ def seed_demo_catalog(
         "tags_upserted": 1,
         "tag_urns": [str(pii_tag.urn)],
     }
+
+
+def _set_ingestion_field_tags(*, dataset: Any, field: str, tags: list[str]) -> None:
+    """Attach source-owned tags to schema metadata instead of its editable overlay."""
+    from datahub.sdk._attribution import KnownAttribution, change_default_attribution
+
+    with change_default_attribution(KnownAttribution.INGESTION):
+        dataset[field].set_tags(tags)
 
 
 def _build_demo_query_mcps(query: DemoQuery) -> list[Any]:

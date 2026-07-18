@@ -62,6 +62,9 @@ def test_demo_seed_builds_tagged_two_hop_column_lineage() -> None:
         _dataset_type=StubDataset,
         _tag_type=StubTag,
         _emit_mode="sync-wait",
+        _field_tagger=lambda **payload: payload["dataset"][payload["field"]].set_tags(
+            payload["tags"]
+        ),
         _query_writer=record_query,
     )
 

@@ -157,7 +157,7 @@ jobs:
               latest["ready"] = False
               evidence.write_text(json.dumps(latest, indent=2, sort_keys=True) + "\n")
               raise RuntimeError(
-                  "DataHub did not expose the seeded two-hop column lineage within 180 seconds"
+                  "DataHub did not expose the seeded lineage and source tag within 180 seconds"
               )
           PY
 
