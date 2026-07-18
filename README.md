@@ -126,4 +126,4 @@ python -m ruff check .
 - Query patches: SQL-AST rewriting of unqualified field references; ambiguous qualified references are left untouched and flagged for manual review in the manifest.
 - Live deployment: requires a reachable DataHub GMS endpoint and a container runtime for the local quickstart.
 
-See [the product requirements](docs/PRD.md) for acceptance criteria and non-goals. Licensed under [Apache 2.0](LICENSE).
+See the [product requirements](docs/PRD.md), [three-minute demo runbook](docs/DEMO.md), [live validation checklist](docs/LIVE_VALIDATION.md), and [draft submission copy](docs/SUBMISSION.md). Licensed under [Apache 2.0](LICENSE).
