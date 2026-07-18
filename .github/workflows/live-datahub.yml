@@ -356,9 +356,17 @@ jobs:
 
           document_urn = write_back["decision_document_urn"]
           assert document_urn.startswith("urn:li:document:")
-          document = (root / "decision-document.json").read_text()
-          assert document_urn in document
-          assert "SchemaFlight" in document
+          document = json.loads((root / "decision-document.json").read_text())
+          document_info = document["documentInfo"]
+          assert document["documentKey"]["id"] == document_urn.removeprefix(
+              "urn:li:document:"
+          )
+          assert document_info["status"]["state"] == "PUBLISHED"
+          assert document_info["title"] == "SchemaFlight: shop.customer.email to primary_email"
+          assert document_info["relatedAssets"] == [
+              {"asset": "urn:li:dataset:(urn:li:dataPlatform:duckdb,shop.customer,PROD)"}
+          ]
+          assert "**Direct rename rejected.**" in document_info["contents"]["text"]
 
           result = {
               "assets_impacted": read_only["assets_impacted"],
