@@ -6,7 +6,9 @@ from schemaflight.demo_datahub import DemoQuery, _build_demo_query_mcps, seed_de
 
 
 datahub_dataset = pytest.importorskip("datahub.sdk.dataset")
+datahub_tag = pytest.importorskip("datahub.sdk.tag")
 DataHubDataset = datahub_dataset.Dataset
+DataHubTag = datahub_tag.Tag
 
 
 class RecordingEntities:
@@ -33,6 +35,7 @@ def test_demo_entities_serialize_with_the_pinned_official_datahub_sdk() -> None:
         server="http://localhost:8080",
         _client_type=RecordingClient,
         _dataset_type=DataHubDataset,
+        _tag_type=DataHubTag,
         _emit_mode="sync-wait",
         _query_writer=lambda **payload: None,
     )
@@ -40,6 +43,8 @@ def test_demo_entities_serialize_with_the_pinned_official_datahub_sdk() -> None:
     client = RecordingClient.last
     assert client is not None
     assert result["datasets_upserted"] == 3
+    assert result["tags_upserted"] == 1
+    assert len(client.entities.proposal_counts) == 4
     assert all(count > 0 for count in client.entities.proposal_counts)
 
 

@@ -18,25 +18,35 @@ def seed_demo_catalog(
     token: str | None = None,
     _client_type: type[Any] | None = None,
     _dataset_type: type[Any] | None = None,
+    _tag_type: type[Any] | None = None,
     _emit_mode: Any | None = None,
     _query_writer: Any | None = None,
 ) -> dict[str, Any]:
     """Upsert the deterministic SchemaFlight demo graph through the official SDK."""
-    if _client_type is None or _dataset_type is None or _emit_mode is None:
+    if _client_type is None or _dataset_type is None or _tag_type is None or _emit_mode is None:
         try:
             from datahub.emitter.rest_emitter import EmitMode
             from datahub.sdk.dataset import Dataset
             from datahub.sdk.main_client import DataHubClient
+            from datahub.sdk.tag import Tag
         except ImportError as error:
             raise RuntimeError(
                 "Seeding DataHub requires the 'datahub' optional dependency."
             ) from error
         _client_type = DataHubClient
         _dataset_type = Dataset
+        _tag_type = Tag
         _emit_mode = EmitMode.SYNC_WAIT
 
     client = _client_type(server=server, token=token)
     client.test_connection()
+
+    pii_tag = _tag_type(
+        name="PII",
+        display_name="PII",
+        description="Personally identifiable information used by the SchemaFlight demo.",
+    )
+    client.entities.upsert(pii_tag, emit_mode=_emit_mode)
 
     source = _dataset_type(
         platform="duckdb",
@@ -50,7 +60,7 @@ def seed_demo_catalog(
         ],
         owners=["data-platform"],
     )
-    source["email"].set_tags(["urn:li:tag:PII"])
+    source["email"].set_tags([str(pii_tag.urn)])
 
     model = _dataset_type(
         platform="duckdb",
@@ -95,6 +105,8 @@ def seed_demo_catalog(
         "dataset_urns": [str(dataset.urn) for dataset in datasets],
         "queries_upserted": 1,
         "query_urns": [query.urn],
+        "tags_upserted": 1,
+        "tag_urns": [str(pii_tag.urn)],
     }
 
 

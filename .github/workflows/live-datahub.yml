@@ -118,10 +118,17 @@ jobs:
                   catalog = AgentContextCatalog.connect(server="http://localhost:8080")
                   first_hop = catalog.downstream(source, "email")
                   second_hop = catalog.downstream(model, "email")
+                  source_asset = catalog.asset(source)
+                  source_email_tags = next(
+                      field["tags"]
+                      for field in source_asset["fields"]
+                      if field["name"] == "email"
+                  )
                   latest = {
                       "attempts": attempts,
                       "first_hop": first_hop,
                       "second_hop": second_hop,
+                      "source_email_tags": source_email_tags,
                   }
                   first_ready = any(
                       edge["downstream_urn"] == model
@@ -133,7 +140,7 @@ jobs:
                       and edge["downstream_field"] == "email"
                       for edge in second_hop
                   )
-                  if first_ready and second_ready:
+                  if first_ready and second_ready and source_email_tags == ["PII"]:
                       latest["ready"] = True
                       evidence.write_text(
                           json.dumps(latest, indent=2, sort_keys=True) + "\n"
@@ -308,6 +315,8 @@ jobs:
           assert set(seed["dataset_urns"]) == expected_datasets
           assert seed["queries_upserted"] == 1
           assert seed["query_urns"] == ["urn:li:query:retention-export"]
+          assert seed["tags_upserted"] == 1
+          assert seed["tag_urns"] == ["urn:li:tag:PII"]
           assert document_search["total"] == 0
           assert document_search["searchResults"] == []
 
