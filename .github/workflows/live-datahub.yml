@@ -1,0 +1,333 @@
+name: Live DataHub validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      DATAHUB_GMS_URL: http://localhost:8080
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Prepare runner capacity for DataHub
+        run: |
+          mkdir -p build/live-validation
+          df -h /
+          sudo sysctl -w vm.max_map_count=262144
+          for expected in /usr/local/lib/android /usr/share/dotnet /opt/ghc; do
+            resolved=$(readlink -f "$expected" || true)
+            case "$resolved" in
+              /usr/local/lib/android|/usr/share/dotnet|/opt/ghc)
+                sudo rm -rf -- "$resolved"
+                ;;
+            esac
+          done
+          python -m pip cache purge || true
+          docker system prune --all --force
+          free_disk_bytes=$(df --output=avail -B1 / | tail -1 | tr -d ' ')
+          total_memory_bytes=$(awk '/MemTotal/ {print $2 * 1024}' /proc/meminfo)
+          {
+            echo "free_disk_bytes=${free_disk_bytes}"
+            echo "total_memory_bytes=${total_memory_bytes}"
+          } | tee build/live-validation/runner-resources.txt
+          test "$free_disk_bytes" -ge 13958643712
+          test "$total_memory_bytes" -ge 8589934592
+          df -h /
+
+      - name: Install SchemaFlight with the pinned DataHub integration
+        run: |
+          python -m pip install -e ".[dev,datahub]"
+          python -m pip install playwright==1.61.0
+
+      - name: Record tool versions
+        run: |
+          {
+            echo "release_sha=${GITHUB_SHA}"
+            uname -a
+            python --version
+            docker --version
+            docker compose version
+            google-chrome --version
+            datahub version
+            python -c "from importlib.metadata import version; print(f'datahub-agent-context={version(\"datahub-agent-context\")}')"
+          } | tee build/live-validation/versions.txt
+
+      - name: Recheck capacity after dependencies
+        run: |
+          python -m pip cache purge || true
+          free_disk_bytes=$(df --output=avail -B1 / | tail -1 | tr -d ' ')
+          total_memory_bytes=$(awk '/MemTotal/ {print $2 * 1024}' /proc/meminfo)
+          {
+            echo "post_install_free_disk_bytes=${free_disk_bytes}"
+            echo "post_install_total_memory_bytes=${total_memory_bytes}"
+          } | tee -a build/live-validation/runner-resources.txt
+          test "$free_disk_bytes" -ge 13958643712
+          test "$total_memory_bytes" -ge 8589934592
+          df -h /
+
+      - name: Start DataHub v1.6.0
+        run: |
+          datahub docker quickstart \
+            --version v1.6.0 \
+            --dump-logs-on-failure
+          curl --fail --retry 12 --retry-delay 5 http://localhost:8080/health
+          curl --fail --retry 12 --retry-delay 5 http://localhost:9002/ >/dev/null
+          docker ps --format '{{.Names}} {{.Image}} {{.Status}}' \
+            | tee build/live-validation/containers.txt
+          grep -E 'acryldata/datahub-gms:v1\.6\.0' build/live-validation/containers.txt
+
+      - name: Seed synthetic metadata
+        run: |
+          python -m schemaflight seed-datahub \
+            --datahub-server http://localhost:8080 \
+            | tee build/live-validation/seed.jsonl
+
+      - name: Compile from live metadata without mutation
+        run: |
+          python -m schemaflight compile \
+            --datahub-server http://localhost:8080 \
+            --request examples/ecommerce/rename-email.json \
+            --output build/live-demo-readonly \
+            | tee build/live-validation/read-only-compile.jsonl
+          document_query='query SearchDocuments($input: SearchInput!) { search(input: $input) { total searchResults { entity { urn type } } } }'
+          datahub graphql \
+            --query "$document_query" \
+            --variables '{"input":{"type":"DOCUMENT","query":"SchemaFlight","start":0,"count":10}}' \
+            --format json \
+            --no-pretty \
+            > build/live-validation/documents-after-read-only.json
+
+      - name: Render the self-contained live report
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from playwright.sync_api import sync_playwright
+
+          report = Path("build/live-demo-readonly/report.html").resolve()
+          evidence = Path("build/live-validation")
+          console_errors: list[str] = []
+          external_requests: list[str] = []
+
+          with sync_playwright() as playwright:
+              browser = playwright.chromium.launch(channel="chrome")
+              page = browser.new_page(viewport={"width": 1440, "height": 1000})
+              page.on(
+                  "console",
+                  lambda message: console_errors.append(message.text)
+                  if message.type == "error"
+                  else None,
+              )
+              page.on(
+                  "request",
+                  lambda request: external_requests.append(request.url)
+                  if not request.url.startswith(("file:", "data:", "blob:"))
+                  else None,
+              )
+              page.goto(report.as_uri(), wait_until="networkidle")
+              body = page.locator("body").inner_text()
+              assert "SchemaFlight" in page.title()
+              assert "SCHEMAFLIGHT" in body
+              assert "DIRECT RENAME REJECTED" in body
+              assert "analytics.customer_360" in body
+              page.screenshot(path=evidence / "live-report.png", full_page=True)
+              browser.close()
+
+          assert console_errors == []
+          assert external_requests == []
+          (evidence / "report-browser-check.json").write_text(
+              json.dumps(
+                  {
+                      "console_errors": console_errors,
+                      "external_requests": external_requests,
+                      "rendered": True,
+                  },
+                  indent=2,
+                  sort_keys=True,
+              )
+              + "\n"
+          )
+          PY
+
+      - name: Compile and explicitly publish the decision document
+        id: writeback
+        run: |
+          python -m schemaflight compile \
+            --datahub-server http://localhost:8080 \
+            --request examples/ecommerce/rename-email.json \
+            --output build/live-demo-writeback \
+            --write-back \
+            | tee build/live-validation/write-back-compile.jsonl
+          document_urn=$(python - <<'PY'
+          import json
+          from pathlib import Path
+
+          lines = Path("build/live-validation/write-back-compile.jsonl").read_text().splitlines()
+          for line in reversed(lines):
+              try:
+                  result = json.loads(line)
+              except json.JSONDecodeError:
+                  continue
+              print(result["decision_document_urn"])
+              break
+          else:
+              raise SystemExit("write-back output did not contain a JSON summary")
+          PY
+          )
+          echo "urn=${document_urn}" >> "$GITHUB_OUTPUT"
+          datahub get urn --urn "$document_urn" \
+            > build/live-validation/decision-document.json
+
+      - name: Assert live evidence
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path("build/live-validation")
+
+          def last_json(path: Path) -> dict:
+              for line in reversed(path.read_text().splitlines()):
+                  try:
+                      return json.loads(line)
+                  except json.JSONDecodeError:
+                      continue
+              raise AssertionError(f"No JSON object found in {path}")
+
+          seed = last_json(root / "seed.jsonl")
+          read_only = last_json(root / "read-only-compile.jsonl")
+          write_back = last_json(root / "write-back-compile.jsonl")
+          manifest = json.loads(
+              Path("build/live-demo-readonly/impact-manifest.json").read_text()
+          )
+          document_search = json.loads(
+              (root / "documents-after-read-only.json").read_text()
+          )
+          document_search = document_search.get("data", document_search)["search"]
+          containers = (root / "containers.txt").read_text().splitlines()
+          versions = (root / "versions.txt").read_text()
+
+          expected_datasets = {
+              "urn:li:dataset:(urn:li:dataPlatform:duckdb,shop.customer,PROD)",
+              "urn:li:dataset:(urn:li:dataPlatform:duckdb,analytics.customer_360,PROD)",
+              "urn:li:dataset:(urn:li:dataPlatform:duckdb,growth.retention_export,PROD)",
+          }
+          expected_impacted = {
+              "urn:li:dataset:(urn:li:dataPlatform:duckdb,analytics.customer_360,PROD)",
+              "urn:li:dataset:(urn:li:dataPlatform:duckdb,growth.retention_export,PROD)",
+          }
+          expected_edges = {
+              (
+                  "urn:li:dataset:(urn:li:dataPlatform:duckdb,shop.customer,PROD)",
+                  "email",
+                  "urn:li:dataset:(urn:li:dataPlatform:duckdb,analytics.customer_360,PROD)",
+                  "email",
+              ),
+              (
+                  "urn:li:dataset:(urn:li:dataPlatform:duckdb,analytics.customer_360,PROD)",
+                  "email",
+                  "urn:li:dataset:(urn:li:dataPlatform:duckdb,growth.retention_export,PROD)",
+                  "email",
+              ),
+          }
+          assert seed["datasets_upserted"] == 3
+          assert set(seed["dataset_urns"]) == expected_datasets
+          assert seed["queries_upserted"] == 1
+          assert seed["query_urns"] == ["urn:li:query:retention-export"]
+          assert document_search["total"] == 0
+          assert document_search["searchResults"] == []
+
+          for summary in (read_only, write_back):
+              assert summary["risk"] == "high"
+              assert summary["direct_rename_allowed"] is False
+              assert summary["assets_impacted"] == 2
+
+          assert manifest["source"]["name"] == "shop.customer"
+          assert manifest["source"]["field_tags"] == ["PII"]
+          assert set(manifest["evidence"]["impacted_urns"]) == expected_impacted
+          observed_edges = {
+              (
+                  edge["upstream_urn"],
+                  edge["upstream_field"],
+                  edge["downstream_urn"],
+                  edge["downstream_field"],
+              )
+              for edge in manifest["evidence"]["lineage_edges"]
+          }
+          assert observed_edges == expected_edges
+          assert manifest["evidence"]["lineage_hops"] == 2
+          assert manifest["evidence"]["query_ids"] == ["retention-export"]
+          assert manifest["evidence"]["queries_requiring_review"] == []
+          assert manifest["owner_routes"] == {
+              "analytics": ["analytics.customer_360"],
+              "growth": ["growth.retention_export"],
+          }
+          query_patch = Path(
+              "build/live-demo-readonly/query_patches/retention-export.sql"
+          )
+          assert query_patch.is_file()
+          assert "primary_email" in query_patch.read_text()
+          assert any("acryldata/datahub-gms:v1.6.0" in line for line in containers)
+          assert "datahub-agent-context=1.6.0.13" in versions
+          assert f"release_sha={os.environ['GITHUB_SHA']}" in versions
+
+          document_urn = write_back["decision_document_urn"]
+          assert document_urn.startswith("urn:li:document:")
+          document = (root / "decision-document.json").read_text()
+          assert document_urn in document
+          assert "SchemaFlight" in document
+
+          result = {
+              "assets_impacted": read_only["assets_impacted"],
+              "datahub_image": "acryldata/datahub-gms:v1.6.0",
+              "decision_document_urn": document_urn,
+              "direct_rename_allowed": read_only["direct_rename_allowed"],
+              "lineage_hops": manifest["evidence"]["lineage_hops"],
+              "query_patch": "retention-export.sql",
+              "release_sha": os.environ["GITHUB_SHA"],
+              "risk": read_only["risk"],
+              "seeded_datasets": seed["datasets_upserted"],
+              "status": "automated_live_checks_passed",
+          }
+          (root / "validation-summary.json").write_text(
+              json.dumps(result, indent=2, sort_keys=True) + "\n"
+          )
+          print(json.dumps(result, sort_keys=True))
+          PY
+
+      - name: Run regressions
+        run: |
+          python -m pytest
+          python -m ruff check .
+          python -m ruff format --check .
+
+      - name: Upload sanitized live-validation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: schemaflight-live-datahub-${{ github.run_id }}
+          path: |
+            build/live-validation
+            build/live-demo-readonly
+            build/live-demo-writeback
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop DataHub
+        if: always()
+        run: datahub docker quickstart --stop || true
